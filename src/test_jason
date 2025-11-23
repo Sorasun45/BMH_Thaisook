@@ -1,0 +1,202 @@
+#include "bmh_json.h"
+#include <ArduinoJson.h>
+#include "config.h"
+#include <stdio.h>
+
+// helper
+static String ts() { return String(millis()); }
+
+void bmh_json_emit_A0(const uint8_t *buf,int len) {
+  DynamicJsonDocument doc(256);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = "A0";
+  if (len >= 4) doc["status"] = buf[3];
+  serializeJson(doc, Serial); Serial.println();
+}
+
+void bmh_json_emit_A1(const uint8_t *buf,int len) {
+  DynamicJsonDocument doc(512);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = "A1";
+  if (len >= 14) {
+    doc["weight_status"] = buf[3];
+    doc["tare_flag"] = buf[4];
+    int16_t stable_catty_x10 = (int16_t)(buf[5] | (buf[6]<<8));
+    int16_t realtime_catty_x10 = (int16_t)(buf[7] | (buf[8]<<8));
+    uint32_t adc = (uint32_t)buf[9] | (uint32_t)(buf[10]<<8) | (uint32_t)(buf[11]<<16) | (uint32_t)(buf[12]<<24);
+    doc["stable_catty_x10"] = stable_catty_x10;
+    doc["stable_kg"] = (stable_catty_x10/10.0) * 0.5;
+    doc["realtime_catty_x10"] = realtime_catty_x10;
+    doc["realtime_kg"] = (realtime_catty_x10/10.0) * 0.5;
+    doc["adc"] = adc;
+  }
+  serializeJson(doc, Serial); Serial.println();
+}
+
+void bmh_json_emit_B0(const uint8_t *buf,int len) {
+  DynamicJsonDocument doc(256);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = "B0";
+  if (len >= 4) doc["result"] = buf[3];
+  serializeJson(doc, Serial); Serial.println();
+}
+
+void bmh_json_emit_B1(const uint8_t *buf,int len) {
+  DynamicJsonDocument doc(1024);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = "B1";
+  if (len >= 6) {
+    doc["freq_code"] = buf[3];
+    doc["state"] = buf[4];
+    doc["type"] = buf[5];
+    // attempt parse body data heuristically
+    JsonArray arr = doc.createNestedArray("raw_values");
+    for (int i=6;i<len-1;i++) arr.add(buf[i]);
+  }
+  serializeJson(doc, Serial); Serial.println();
+}
+
+void bmh_json_emit_10(const uint8_t *buf,int len) {
+  DynamicJsonDocument doc(512);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = "0x10";
+  if (len >= 9) {
+    doc["res"] = buf[3];
+    doc["addr"] = buf[4];
+    uint32_t val = (uint32_t)buf[5] | ((uint32_t)buf[6]<<8) | ((uint32_t)buf[7]<<16) | ((uint32_t)buf[8]<<24);
+    doc["value_raw"] = val;
+  }
+  serializeJson(doc, Serial); Serial.println();
+}
+
+void bmh_json_emit_E0(const uint8_t *buf,int len) {
+  DynamicJsonDocument doc(256);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = "E0";
+  if (len >= 6) {
+    doc["type"] = buf[3];
+    doc["version"] = (uint16_t)(buf[4] | (buf[5]<<8));
+  }
+  serializeJson(doc, Serial); Serial.println();
+}
+void bmh_json_emit_E1(const uint8_t *buf,int len) {
+  DynamicJsonDocument doc(128);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = "E1";
+  if (len >= 4) doc["res"] = buf[3];
+  serializeJson(doc, Serial); Serial.println();
+}
+
+void bmh_json_emit_F0(const uint8_t *buf,int len) {
+  DynamicJsonDocument doc(512);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = "F0";
+  JsonArray arr = doc.createNestedArray("raw");
+  for (int i=3;i<len-1;i++) arr.add(buf[i]);
+  serializeJson(doc, Serial); Serial.println();
+}
+
+void bmh_json_emit_FF(const uint8_t *buf,int len) {
+  DynamicJsonDocument doc(128);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = "FF";
+  serializeJson(doc, Serial); Serial.println();
+}
+
+void bmh_json_emit_unknown(const uint8_t *buf,int len) {
+  DynamicJsonDocument doc(256);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["unknown_cmd"] = buf[2];
+  JsonArray arr = doc.createNestedArray("payload");
+  for (int i=3;i<len-1;i++) arr.add(buf[i]);
+  serializeJson(doc, Serial); Serial.println();
+}
+
+void bmh_json_emit_error_checksum(const uint8_t *buf,int len) {
+  DynamicJsonDocument doc(256);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["error"] = "checksum_fail";
+  doc["cmd"] = buf[2];
+  doc["len"] = len;
+  serializeJson(doc, Serial); Serial.println();
+}
+
+void bmh_json_emit_multi_timeout(const char *cmd, int received, int expected) {
+  DynamicJsonDocument doc(256);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = cmd;
+  doc["error"] = "timeout_incomplete_packages";
+  doc["received_pkgs"] = received;
+  doc["expected_pkgs"] = expected;
+  serializeJson(doc, Serial); Serial.println();
+}
+
+// D0 finalizer
+void bmh_json_emit_D0(uint8_t **pkgs, int *pkglens, int total) {
+  DynamicJsonDocument doc(JSON_DOC_CAPACITY);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = "D0";
+  doc["type"] = "body270";
+  JsonObject pk = doc.createNestedObject("packages");
+  for (int i=0;i<total;i++){
+    if (!pkgs[i]) continue;
+    char key[8]; snprintf(key,sizeof(key),"pkg%d", i+1);
+    JsonObject p = pk.createNestedObject(key);
+    int len = pkglens[i];
+    const uint8_t *buf = pkgs[i];
+    // basic mapping for pkg1..pkg5 as earlier
+    if (i==0) {
+      auto safeU16 = [&](int off){ if (off+1 < len) return (uint16_t)(buf[off]|(buf[off+1]<<8)); return (uint16_t)0; };
+      p["body_weight_kg"] = safeU16(5)/10.0;
+      p["fat_mass_kg"] = safeU16(17)/10.0;
+      p["lean_mass_kg"] = safeU16(35)/10.0;
+    } else {
+      JsonArray arr = p.createNestedArray("raw");
+      for (int j=5;j<len-1;j++) arr.add(buf[j]);
+    }
+  }
+  serializeJson(doc, Serial); Serial.println();
+}
+
+// For D1/D2 minimal
+void bmh_json_emit_D1(uint8_t **pkgs, int *pkglens, int total) {
+  DynamicJsonDocument doc(8192);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = "D1";
+  JsonArray pk = doc.createNestedArray("packages");
+  for (int i=0;i<total;i++){
+    JsonArray raw = pk.createNestedArray();
+    if (pkgs[i]) {
+      for (int j=5;j<pkglens[i]-1;j++) raw.add(pkgs[i][j]);
+    }
+  }
+  serializeJson(doc, Serial); Serial.println();
+}
+void bmh_json_emit_D2(uint8_t **pkgs, int *pkglens, int total) {
+  DynamicJsonDocument doc(8192);
+  doc["timestamp"] = ts();
+  doc["device"] = "BMH05108";
+  doc["command"] = "D2";
+  JsonArray pk = doc.createNestedArray("packages");
+  for (int i=0;i<total;i++){
+    JsonArray raw = pk.createNestedArray();
+    if (pkgs[i]) {
+      for (int j=5;j<pkglens[i]-1;j++) raw.add(pkgs[i][j]);
+    }
+  }
+  serializeJson(doc, Serial); Serial.println();
+}

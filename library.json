@@ -1,0 +1,46 @@
+{
+  "name": "BMH-Protocol",
+  "version": "1.0.0",
+  "description": "BMH05108 UART Protocol Library — Frame assembly, command dispatch, and JSON response generation",
+  "keywords": [
+    "bmh",
+    "bmh05108",
+    "uart",
+    "protocol",
+    "frame",
+    "json",
+    "esp32",
+    "arduino"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sorasun45/BMH_Thaisook.git"
+  },
+  "authors": [
+    {
+      "name": "Sorasun",
+      "email": "mr.kiattisak45@gmail.com",
+      "url": "https://github.com/Sorasun45",
+      "maintainer": true
+    }
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/Sorasun45/BMH_Thaisook.git",
+  "frameworks": [
+    "arduino"
+  ],
+  "platforms": [
+    "espressif32",
+    "espressif8266",
+    "atmelavr"
+  ],
+  "dependencies": {
+    "bblanchon/ArduinoJson": "^6.x"
+  },
+  "export": {
+    "include": [
+      "include",
+      "src"
+    ]
+  }
+}
