@@ -29,6 +29,8 @@ void initMeasurementData(MeasurementData &data) {
   data.lastImpLF = 0;
   data.impStableCount = 0;
   data.impHasInitial = false;
+  
+  data.resultPackets.reset();
 }
 
 void resetMeasurementData(MeasurementData &data) {
@@ -43,6 +45,8 @@ void resetMeasurementData(MeasurementData &data) {
   data.tare_sample_count = 0;
   data.tare_sum = 0;
   data.weight_threshold_reached = false;
+  
+  data.resultPackets.reset();
 }
 
 void processDeviceFrame(const uint8_t *frame, size_t frameLen, 
@@ -251,6 +255,99 @@ void processDeviceFrame(const uint8_t *frame, size_t frameLen,
   {
     Serial.println("Received B0 ACK frame (mode ack).");
   }
+  else if (order == 0xD0)
+  {
+    // D0 Result packets - ตรวจสอบ PackageNo ที่ byte 3
+    if (frameLen < 5)
+    {
+      Serial.println("D0 frame too short");
+      return;
+    }
+    
+    uint8_t packageNo = frame[3];  // 0x51..0x55
+    uint8_t errorType = frame[4];  // Error type
+    
+    Serial.printf("Received D0 result packet: PackageNo=0x%02X, Error=0x%02X\n", packageNo, errorType);
+    
+    // Store error type from first packet
+    if (packageNo == 0x51)
+    {
+      mData.resultPackets.error_type = (ErrorType)errorType;
+      if (errorType != 0x00)
+      {
+        Serial.printf("*** ERROR DETECTED: 0x%02X ***\n", errorType);
+      }
+    }
+    
+    // Validate packet length based on PackageNo
+    size_t expectedLen = 0;
+    switch(packageNo)
+    {
+      case 0x51: expectedLen = 0x50; break;  // 80 bytes
+      case 0x52: expectedLen = 0x2E; break;  // 46 bytes
+      case 0x53: expectedLen = 0x3A; break;  // 58 bytes
+      case 0x54: expectedLen = 0x16; break;  // 22 bytes
+      case 0x55: expectedLen = 0x16; break;  // 22 bytes
+      default:
+        Serial.printf("Unknown PackageNo: 0x%02X\n", packageNo);
+        return;
+    }
+    
+    if (frameLen != expectedLen)
+    {
+      Serial.printf("Length mismatch: expected %d, got %d\n", expectedLen, frameLen);
+      return;
+    }
+    
+    // เก็บ packet ตาม PackageNo
+    switch(packageNo)
+    {
+      case 0x51:
+        if (!mData.resultPackets.received1) {
+          memcpy(mData.resultPackets.packet1, frame, frameLen);
+          mData.resultPackets.len1 = frameLen;
+          mData.resultPackets.received1 = true;
+          mData.resultPackets.received_count++;
+        }
+        break;
+      case 0x52:
+        if (!mData.resultPackets.received2) {
+          memcpy(mData.resultPackets.packet2, frame, frameLen);
+          mData.resultPackets.len2 = frameLen;
+          mData.resultPackets.received2 = true;
+          mData.resultPackets.received_count++;
+        }
+        break;
+      case 0x53:
+        if (!mData.resultPackets.received3) {
+          memcpy(mData.resultPackets.packet3, frame, frameLen);
+          mData.resultPackets.len3 = frameLen;
+          mData.resultPackets.received3 = true;
+          mData.resultPackets.received_count++;
+        }
+        break;
+      case 0x54:
+        if (!mData.resultPackets.received4) {
+          memcpy(mData.resultPackets.packet4, frame, frameLen);
+          mData.resultPackets.len4 = frameLen;
+          mData.resultPackets.received4 = true;
+          mData.resultPackets.received_count++;
+        }
+        break;
+      case 0x55:
+        if (!mData.resultPackets.received5) {
+          memcpy(mData.resultPackets.packet5, frame, frameLen);
+          mData.resultPackets.len5 = frameLen;
+          mData.resultPackets.received5 = true;
+          mData.resultPackets.received_count++;
+        }
+        break;
+    }
+    
+    Serial.printf("Progress: %d/%d packets received\n", 
+                  mData.resultPackets.received_count, 
+                  mData.resultPackets.total_packets);
+  }
   else
   {
     Serial.printf("Unknown order: %02X\n", order);
@@ -307,4 +404,280 @@ void buildAndSendFinalPacket(const UserInfo &userInfo, const MeasurementData &mD
 
   buildAndSend(body, sizeof(body));
   Serial.println("Final 8-Electrode packet (D0) sent. Waiting for result...");
+}
+
+// Helper function to get body type string
+const char* getBodyTypeString(uint8_t typeCode)
+{
+  switch(typeCode)
+  {
+    case 0x01: return "Thin type";
+    case 0x02: return "Lean muscular type";
+    case 0x03: return "Muscular type";
+    case 0x04: return "Bloated obesity type";
+    case 0x05: return "Fat muscular type";
+    case 0x06: return "Muscular fat type";
+    case 0x07: return "Not athletic";
+    case 0x08: return "Standard type";
+    case 0x09: return "Standard muscle type";
+    default: return "Unknown";
+  }
+}
+
+// Helper function to get error type string
+const char* getErrorTypeString(uint8_t errorCode)
+{
+  switch(errorCode)
+  {
+    case 0x00: return "No errors";
+    case 0x01: return "Wrong age";
+    case 0x02: return "Wrong height";
+    case 0x03: return "Wrong weight";
+    case 0x04: return "Wrong gender";
+    case 0x05: return "User type error";
+    case 0x06: return "Wrong impedance of both feet";
+    case 0x07: return "Hand impedance error";
+    case 0x08: return "Left whole body impedance error";
+    case 0x09: return "Left hand impedance error";
+    case 0x0A: return "Right hand impedance error";
+    case 0x0B: return "Left foot impedance error";
+    case 0x0C: return "Right foot impedance error";
+    case 0x0D: return "Torso impedance error";
+    default: return "Unknown error";
+  }
+}
+
+// Helper to get standard level string
+const char* getStdLevelString(uint8_t level)
+{
+  switch(level)
+  {
+    case 0: return "low";
+    case 1: return "normal";
+    case 2: return "high";
+    default: return "unknown";
+  }
+}
+
+void parseAndDisplayResultJSON(const ResultPackets &packets)
+{
+  Serial.println("\n=== MEASUREMENT RESULTS ===");
+  
+  // Check for errors first
+  if (packets.hasError())
+  {
+    Serial.println("{");
+    Serial.println("  \"status\": \"error\",");
+    Serial.printf("  \"error_code\": \"0x%02X\",\n", packets.error_type);
+    Serial.printf("  \"error_message\": \"%s\"\n", getErrorTypeString(packets.error_type));
+    Serial.println("}");
+    Serial.println("=========================\n");
+    return;
+  }
+  
+  Serial.println("{");
+  Serial.println("  \"status\": \"success\",");
+  Serial.printf("  \"total_packets\": %d,\n", packets.total_packets);
+  Serial.printf("  \"received_packets\": %d,\n", packets.received_count);
+  
+  // ===== PACKET 1 (0x51) - Main body composition =====
+  if (packets.received1 && packets.len1 == 0x50)
+  {
+    const uint8_t *p = packets.packet1;
+    Serial.println("  \"body_composition\": {");
+    
+    // Weight measurements (bytes 5-40)
+    Serial.printf("    \"weight_kg\": %.1f,\n", le_u16(&p[5]) / 10.0);
+    Serial.printf("    \"weight_std_min_kg\": %.1f,\n", le_u16(&p[7]) / 10.0);
+    Serial.printf("    \"weight_std_max_kg\": %.1f,\n", le_u16(&p[9]) / 10.0);
+    
+    Serial.printf("    \"moisture_kg\": %.1f,\n", le_u16(&p[11]) / 10.0);
+    Serial.printf("    \"moisture_std_min_kg\": %.1f,\n", le_u16(&p[13]) / 10.0);
+    Serial.printf("    \"moisture_std_max_kg\": %.1f,\n", le_u16(&p[15]) / 10.0);
+    
+    Serial.printf("    \"body_fat_mass_kg\": %.1f,\n", le_u16(&p[17]) / 10.0);
+    Serial.printf("    \"body_fat_std_min_kg\": %.1f,\n", le_u16(&p[19]) / 10.0);
+    Serial.printf("    \"body_fat_std_max_kg\": %.1f,\n", le_u16(&p[21]) / 10.0);
+    
+    Serial.printf("    \"protein_mass_kg\": %.1f,\n", le_u16(&p[23]) / 10.0);
+    Serial.printf("    \"protein_std_min_kg\": %.1f,\n", le_u16(&p[25]) / 10.0);
+    Serial.printf("    \"protein_std_max_kg\": %.1f,\n", le_u16(&p[27]) / 10.0);
+    
+    Serial.printf("    \"inorganic_salt_kg\": %.1f,\n", le_u16(&p[29]) / 10.0);
+    Serial.printf("    \"inorganic_std_min_kg\": %.1f,\n", le_u16(&p[31]) / 10.0);
+    Serial.printf("    \"inorganic_std_max_kg\": %.1f,\n", le_u16(&p[33]) / 10.0);
+    
+    Serial.printf("    \"lean_body_weight_kg\": %.1f,\n", le_u16(&p[35]) / 10.0);
+    Serial.printf("    \"lean_body_std_min_kg\": %.1f,\n", le_u16(&p[37]) / 10.0);
+    Serial.printf("    \"lean_body_std_max_kg\": %.1f,\n", le_u16(&p[39]) / 10.0);
+    
+    Serial.printf("    \"muscle_mass_kg\": %.1f,\n", le_u16(&p[41]) / 10.0);
+    Serial.printf("    \"muscle_std_min_kg\": %.1f,\n", le_u16(&p[43]) / 10.0);
+    Serial.printf("    \"muscle_std_max_kg\": %.1f,\n", le_u16(&p[45]) / 10.0);
+    
+    Serial.printf("    \"bone_mass_kg\": %.1f,\n", le_u16(&p[47]) / 10.0);
+    Serial.printf("    \"bone_std_min_kg\": %.1f,\n", le_u16(&p[49]) / 10.0);
+    Serial.printf("    \"bone_std_max_kg\": %.1f,\n", le_u16(&p[51]) / 10.0);
+    
+    Serial.printf("    \"skeletal_muscle_kg\": %.1f,\n", le_u16(&p[53]) / 10.0);
+    Serial.printf("    \"skeletal_std_min_kg\": %.1f,\n", le_u16(&p[55]) / 10.0);
+    Serial.printf("    \"skeletal_std_max_kg\": %.1f,\n", le_u16(&p[57]) / 10.0);
+    
+    Serial.printf("    \"intracellular_water_kg\": %.1f,\n", le_u16(&p[59]) / 10.0);
+    Serial.printf("    \"ic_water_std_min_kg\": %.1f,\n", le_u16(&p[61]) / 10.0);
+    Serial.printf("    \"ic_water_std_max_kg\": %.1f,\n", le_u16(&p[63]) / 10.0);
+    
+    Serial.printf("    \"extracellular_water_kg\": %.1f,\n", le_u16(&p[65]) / 10.0);
+    Serial.printf("    \"ec_water_std_min_kg\": %.1f,\n", le_u16(&p[67]) / 10.0);
+    Serial.printf("    \"ec_water_std_max_kg\": %.1f,\n", le_u16(&p[69]) / 10.0);
+    
+    Serial.printf("    \"body_cell_mass_kg\": %.1f,\n", le_u16(&p[71]) / 10.0);
+    Serial.printf("    \"bcm_std_min_kg\": %.1f,\n", le_u16(&p[73]) / 10.0);
+    Serial.printf("    \"bcm_std_max_kg\": %.1f,\n", le_u16(&p[75]) / 10.0);
+    
+    Serial.printf("    \"subcutaneous_fat_mass_kg\": %.1f\n", le_u16(&p[77]) / 10.0);
+    Serial.println("  },");
+  }
+  
+  // ===== PACKET 2 (0x52) - Segmental analysis =====
+  if (packets.received2 && packets.len2 == 0x2E)
+  {
+    const uint8_t *p = packets.packet2;
+    Serial.println("  \"segmental_analysis\": {");
+    
+    // Fat mass by segment (kg)
+    Serial.println("    \"fat_mass_kg\": {");
+    Serial.printf("      \"right_hand\": %.1f,\n", le_u16(&p[5]) / 10.0);
+    Serial.printf("      \"left_hand\": %.1f,\n", le_u16(&p[7]) / 10.0);
+    Serial.printf("      \"trunk\": %.1f,\n", le_u16(&p[9]) / 10.0);
+    Serial.printf("      \"right_foot\": %.1f,\n", le_u16(&p[11]) / 10.0);
+    Serial.printf("      \"left_foot\": %.1f\n", le_u16(&p[13]) / 10.0);
+    Serial.println("    },");
+    
+    // Fat percentage by segment
+    Serial.println("    \"fat_percent\": {");
+    Serial.printf("      \"right_hand\": %.1f,\n", le_u16(&p[15]) / 10.0);
+    Serial.printf("      \"left_hand\": %.1f,\n", le_u16(&p[17]) / 10.0);
+    Serial.printf("      \"trunk\": %.1f,\n", le_u16(&p[19]) / 10.0);
+    Serial.printf("      \"right_foot\": %.1f,\n", le_u16(&p[21]) / 10.0);
+    Serial.printf("      \"left_foot\": %.1f\n", le_u16(&p[23]) / 10.0);
+    Serial.println("    },");
+    
+    // Muscle mass by segment (kg)
+    Serial.println("    \"muscle_mass_kg\": {");
+    Serial.printf("      \"right_hand\": %.1f,\n", le_u16(&p[25]) / 10.0);
+    Serial.printf("      \"left_hand\": %.1f,\n", le_u16(&p[27]) / 10.0);
+    Serial.printf("      \"trunk\": %.1f,\n", le_u16(&p[29]) / 10.0);
+    Serial.printf("      \"right_foot\": %.1f,\n", le_u16(&p[31]) / 10.0);
+    Serial.printf("      \"left_foot\": %.1f\n", le_u16(&p[33]) / 10.0);
+    Serial.println("    },");
+    
+    // Muscle ratio by segment
+    Serial.println("    \"muscle_ratio_percent\": {");
+    Serial.printf("      \"right_hand\": %.1f,\n", le_u16(&p[35]) / 10.0);
+    Serial.printf("      \"left_hand\": %.1f,\n", le_u16(&p[37]) / 10.0);
+    Serial.printf("      \"trunk\": %.1f,\n", le_u16(&p[39]) / 10.0);
+    Serial.printf("      \"right_foot\": %.1f,\n", le_u16(&p[41]) / 10.0);
+    Serial.printf("      \"left_foot\": %.1f\n", le_u16(&p[43]) / 10.0);
+    Serial.println("    }");
+    Serial.println("  },");
+  }
+  
+  // ===== PACKET 3 (0x53) - Health metrics =====
+  if (packets.received3 && packets.len3 == 0x3A)
+  {
+    const uint8_t *p = packets.packet3;
+    Serial.println("  \"health_metrics\": {");
+    
+    Serial.printf("    \"body_score\": %d,\n", p[5]);
+    Serial.printf("    \"physical_age\": %d,\n", p[6]);
+    Serial.printf("    \"body_type\": %d,\n", p[7]);
+    Serial.printf("    \"body_type_name\": \"%s\",\n", getBodyTypeString(p[7]));
+    Serial.printf("    \"smi\": %.1f,\n", p[8] / 10.0);
+    
+    Serial.printf("    \"whr\": %.2f,\n", p[9] * 0.01);
+    Serial.printf("    \"whr_std_min\": %.2f,\n", p[10] * 0.01);
+    Serial.printf("    \"whr_std_max\": %.2f,\n", p[11] * 0.01);
+    
+    Serial.printf("    \"visceral_fat\": %d,\n", p[12]);
+    Serial.printf("    \"vf_std_min\": %d,\n", p[13]);
+    Serial.printf("    \"vf_std_max\": %d,\n", p[14]);
+    
+    Serial.printf("    \"obesity_percent\": %.1f,\n", le_u16(&p[15]) / 10.0);
+    Serial.printf("    \"obesity_std_min\": %.1f,\n", le_u16(&p[17]) / 10.0);
+    Serial.printf("    \"obesity_std_max\": %.1f,\n", le_u16(&p[19]) / 10.0);
+    
+    Serial.printf("    \"bmi\": %.1f,\n", le_u16(&p[21]) / 10.0);
+    Serial.printf("    \"bmi_std_min\": %.1f,\n", le_u16(&p[23]) / 10.0);
+    Serial.printf("    \"bmi_std_max\": %.1f,\n", le_u16(&p[25]) / 10.0);
+    
+    Serial.printf("    \"body_fat_percent\": %.1f,\n", le_u16(&p[27]) / 10.0);
+    Serial.printf("    \"body_fat_std_min\": %.1f,\n", le_u16(&p[29]) / 10.0);
+    Serial.printf("    \"body_fat_std_max\": %.1f,\n", le_u16(&p[31]) / 10.0);
+    
+    Serial.printf("    \"bmr_kcal\": %d,\n", le_u16(&p[33]));
+    Serial.printf("    \"bmr_std_min_kcal\": %d,\n", le_u16(&p[35]));
+    Serial.printf("    \"bmr_std_max_kcal\": %d,\n", le_u16(&p[37]));
+    
+    Serial.printf("    \"recommended_intake_kcal\": %d,\n", le_u16(&p[39]));
+    Serial.printf("    \"ideal_weight_kg\": %.1f,\n", le_u16(&p[41]) / 10.0);
+    Serial.printf("    \"target_weight_kg\": %.1f,\n", le_u16(&p[43]) / 10.0);
+    
+    // Control values (can be negative)
+    int16_t weight_ctrl = (int16_t)le_u16(&p[45]);
+    int16_t muscle_ctrl = (int16_t)le_u16(&p[47]);
+    int16_t fat_ctrl = (int16_t)le_u16(&p[49]);
+    Serial.printf("    \"weight_control_kg\": %.1f,\n", weight_ctrl / 10.0);
+    Serial.printf("    \"muscle_control_kg\": %.1f,\n", muscle_ctrl / 10.0);
+    Serial.printf("    \"fat_control_kg\": %.1f,\n", fat_ctrl / 10.0);
+    
+    Serial.printf("    \"subcutaneous_fat_percent\": %.1f,\n", le_u16(&p[51]) / 10.0);
+    Serial.printf("    \"subq_std_min\": %.1f,\n", le_u16(&p[53]) / 10.0);
+    Serial.printf("    \"subq_std_max\": %.1f\n", le_u16(&p[55]) / 10.0);
+    Serial.println("  },");
+  }
+  
+  // ===== PACKET 4 (0x54) - Energy consumption =====
+  if (packets.received4 && packets.len4 == 0x16)
+  {
+    const uint8_t *p = packets.packet4;
+    Serial.println("  \"energy_consumption_kcal_per_30min\": {");
+    
+    Serial.printf("    \"walk\": %d,\n", le_u16(&p[5]));
+    Serial.printf("    \"golf\": %d,\n", le_u16(&p[7]));
+    Serial.printf("    \"croquet\": %d,\n", le_u16(&p[9]));
+    Serial.printf("    \"tennis_cycling_basketball\": %d,\n", le_u16(&p[11]));
+    Serial.printf("    \"squash_tkd_fencing\": %d,\n", le_u16(&p[13]));
+    Serial.printf("    \"mountain_climbing\": %d,\n", le_u16(&p[15]));
+    Serial.printf("    \"swimming_aerobic_jog\": %d,\n", le_u16(&p[17]));
+    Serial.printf("    \"badminton_table_tennis\": %d\n", le_u16(&p[19]));
+    Serial.println("  },");
+  }
+  
+  // ===== PACKET 5 (0x55) - Standard classifications =====
+  if (packets.received5 && packets.len5 == 0x16)
+  {
+    const uint8_t *p = packets.packet5;
+    Serial.println("  \"segmental_standards\": {");
+    
+    Serial.println("    \"fat_standard\": {");
+    Serial.printf("      \"right_hand\": \"%s\",\n", getStdLevelString(p[5]));
+    Serial.printf("      \"left_hand\": \"%s\",\n", getStdLevelString(p[6]));
+    Serial.printf("      \"trunk\": \"%s\",\n", getStdLevelString(p[7]));
+    Serial.printf("      \"right_foot\": \"%s\",\n", getStdLevelString(p[8]));
+    Serial.printf("      \"left_foot\": \"%s\"\n", getStdLevelString(p[9]));
+    Serial.println("    },");
+    
+    Serial.println("    \"muscle_standard\": {");
+    Serial.printf("      \"right_hand\": \"%s\",\n", getStdLevelString(p[10]));
+    Serial.printf("      \"left_hand\": \"%s\",\n", getStdLevelString(p[11]));
+    Serial.printf("      \"trunk\": \"%s\",\n", getStdLevelString(p[12]));
+    Serial.printf("      \"right_foot\": \"%s\",\n", getStdLevelString(p[13]));
+    Serial.printf("      \"left_foot\": \"%s\"\n", getStdLevelString(p[14]));
+    Serial.println("    }");
+    Serial.println("  }");
+  }
+  
+  Serial.println("}");
+  Serial.println("=========================\n");
 }

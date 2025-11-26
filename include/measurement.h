@@ -35,6 +35,9 @@ struct MeasurementData {
   uint32_t lastImpRH, lastImpLH, lastImpT, lastImpRF, lastImpLF;
   int impStableCount;
   bool impHasInitial;
+  
+  // Result packets from device
+  ResultPackets resultPackets;
 };
 
 // Initialize measurement data
@@ -50,5 +53,8 @@ void processDeviceFrame(const uint8_t *frame, size_t frameLen,
 
 // Build and send final packet
 void buildAndSendFinalPacket(const UserInfo &userInfo, const MeasurementData &mData);
+
+// Parse and display result packets as JSON
+void parseAndDisplayResultJSON(const ResultPackets &packets);
 
 #endif // MEASUREMENT_H

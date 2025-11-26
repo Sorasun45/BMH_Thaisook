@@ -213,10 +213,38 @@ void processStateMachine(StateMachineContext &ctx) {
   case BUILD_AND_SEND_FINAL:
   {
     buildAndSendFinalPacket(ctx.userInfo, ctx.mData);
-    Serial.println("\n*** Measurement complete! ***");
-    Serial.println("Please step off the scale...");
-    ctx.currentState = DONE;
+    Serial.println("\n*** D0 packet sent! ***");
+    Serial.println("Waiting for calculation results (5 packets)...");
+    ctx.mData.resultPackets.reset();
+    ctx.currentState = WAIT_RESULT_PACKETS;
     ctx.lastPollSendMs = millis();
+    break;
+  }
+
+  case WAIT_RESULT_PACKETS:
+  {
+    // Check if all result packets received
+    if (ctx.mData.resultPackets.isComplete())
+    {
+      Serial.println("\n*** All result packets received! ***");
+      parseAndDisplayResultJSON(ctx.mData.resultPackets);
+      Serial.println("Please step off the scale...");
+      ctx.currentState = DONE;
+      ctx.lastPollSendMs = millis();
+    }
+    else
+    {
+      // Timeout check (30 seconds)
+      if (now - ctx.lastPollSendMs >= 30000)
+      {
+        Serial.println("\n*** Timeout waiting for result packets! ***");
+        Serial.printf("Received only %d/%d packets\n", 
+                     ctx.mData.resultPackets.received_count,
+                     ctx.mData.resultPackets.total_packets);
+        ctx.currentState = DONE;
+        ctx.lastPollSendMs = millis();
+      }
+    }
     break;
   }
 
