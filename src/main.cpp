@@ -35,24 +35,30 @@ HardwareSerial BMH(2); // UART2
 #define BMH_TX_PIN 17
 
 // Timings
-const unsigned long POLL_INTERVAL_MS = 500; // 500 ms
+const unsigned long POLL_INTERVAL_MS = 200; // 200 ms
+const unsigned long WEIGHT_POLL_INTERVAL_MS = 200; // 200 ms for faster weight reading
 
 // Stability thresholds
-const int STABLE_DELTA = 100;       // ±100 units
-const int STABLE_REQUIRED_CNT = 10; // consecutive samples
+const int STABLE_DELTA = 150;       // ±150 units (increased tolerance for faster lock)
+const int STABLE_REQUIRED_CNT = 30;  // consecutive samples (reduced from 10)
+const float MIN_WEIGHT_TO_START = 20.0; // minimum weight in kg to start measuring
+const float MAX_WEIGHT_EMPTY = 5.0;     // maximum weight in kg to consider scale empty
 
 // Enums: states
 enum State
 {
   WAIT_JSON,
   SEND_A0_WAIT_ACK,
+  TARE_WEIGHT,
+  WAIT_FOR_WEIGHT,
   SEND_A1_LOOP,
   SEND_B0_WAIT_ACK,
   SEND_B1_LOOP,
   SEND_B0_2_WAIT_ACK,
   SEND_B1_LOOP2,
   BUILD_AND_SEND_FINAL,
-  DONE
+  DONE,
+  WAIT_SCALE_EMPTY
 };
 
 State state = WAIT_JSON;
@@ -70,6 +76,14 @@ struct UserInfo
 // Measurements
 long weight_final = 0; // stored magnified (e.g. weight*10 as int)
 bool weight_final_valid = false;
+
+// Tare variables
+long tare_offset = 0;  // ADC offset from tare
+bool tare_completed = false;
+int tare_sample_count = 0;
+long tare_sum = 0;
+const int TARE_SAMPLES = 20;  // จำนวนตัวอย่างที่ใช้ในการ tare
+bool weight_threshold_reached = false; // flag when weight exceeds minimum threshold
 
 // เปลี่ยนจากชุดเดียว เป็น 2 ชุด
 struct ImpedanceData
@@ -354,15 +368,95 @@ void processDeviceFrame(const uint8_t *frame, size_t frameLen)
       Serial.printf("Weight raw=%.1f kg | ADC raw=%lu\n",
                     realtimeWeight / 10.0, adc_raw);
 
-      // 3) ใช้ ADC ดิบ + ค่าคาลิเบรต
+      // ถ้าอยู่ใน state TARE_WEIGHT ให้เก็บค่า ADC เพื่อคำนวณ tare
+      if (state == TARE_WEIGHT && !tare_completed)
+      {
+        if (tare_sample_count < TARE_SAMPLES)
+        {
+          tare_sum += (long)adc_raw;
+          tare_sample_count++;
+          Serial.printf("Tare sample %d/%d collected\n", tare_sample_count, TARE_SAMPLES);
+          
+          if (tare_sample_count >= TARE_SAMPLES)
+          {
+            tare_completed = true;
+          }
+        }
+        return; // ไม่ต้องคำนวณน้ำหนักในขั้นตอน tare
+      }
+
+      // 3) ใช้ ADC ดิบ + ค่าคาลิเบรต และหัก tare offset
       // ------------------------------
       // scale_factor = kg / ADC_count
       // adc_zero = ADC at zero load
-      float delta = (float)((int32_t)adc_raw - (int32_t)calib.offset);
+      float delta = (float)((int32_t)adc_raw - (int32_t)calib.offset - (int32_t)tare_offset);
       float weight_kg = delta * calib.scale_factor;
 
       // ใช้ค่านี้เพื่อตรวจความนิ่ง (แปลงเป็นหน่วย x10)
       long usedValueForStability = (long)round(weight_kg * 10.0f);
+
+      // Check if in WAIT_SCALE_EMPTY state and weight is below threshold
+      if (state == WAIT_SCALE_EMPTY)
+      {
+        if (weight_kg < MAX_WEIGHT_EMPTY)
+        {
+          Serial.printf(">>> Scale is empty (%.2f kg < %.1f kg)\n", weight_kg, MAX_WEIGHT_EMPTY);
+          Serial.println("=== Ready for next measurement ===");
+          Serial.println("=== Transitioning to WAIT_JSON state ===");
+          Serial.println("Paste JSON to start new measurement...");
+          state = WAIT_JSON;
+          // Reset all flags for new measurement
+          weight_final_valid = false;
+          impedance_final_valid = false;
+          weightHasInitial = false;
+          impHasInitial = false;
+          weightStableCount = 0;
+          impStableCount = 0;
+          ack_A0_received = false;
+          ack_B0_received = false;
+          ack_B0_2_received = false;
+          tare_offset = 0;
+          tare_completed = false;
+          tare_sample_count = 0;
+          tare_sum = 0;
+          weight_threshold_reached = false;
+          userInfo.valid = false;
+        }
+        else
+        {
+          static unsigned long lastPrintTime = 0;
+          unsigned long currentTime = millis();
+          if (currentTime - lastPrintTime >= 2000) // Print every 2 seconds
+          {
+            Serial.printf("Waiting for scale to be empty... current: %.2f kg\n", weight_kg);
+            lastPrintTime = currentTime;
+          }
+        }
+        return;
+      }
+
+      // Check if in WAIT_FOR_WEIGHT state and weight exceeds threshold
+      if (state == WAIT_FOR_WEIGHT && weight_kg >= MIN_WEIGHT_TO_START)
+      {
+        Serial.printf(">>> Weight detected: %.2f kg (threshold reached!)\n", weight_kg);
+        Serial.println("=== Transitioning to SEND_A1_LOOP state ===");
+        Serial.println("Now measuring weight, please stay still...");
+        state = SEND_A1_LOOP;
+        // Reset stability counters for fresh measurement
+        weightHasInitial = false;
+        weightStableCount = 0;
+        return;
+      }
+
+      // If still in WAIT_FOR_WEIGHT, just monitor and return
+      if (state == WAIT_FOR_WEIGHT)
+      {
+        if ((int)weight_kg > 0) // Only print if there's some weight
+        {
+          Serial.printf("Waiting... current weight: %.2f kg\n", weight_kg);
+        }
+        return;
+      }
 
       // 4) stability logic
       if (!weightHasInitial)
@@ -764,6 +858,12 @@ void loop()
         ack_A0_received = false;
         ack_B0_received = false;
         ack_B0_2_received = false;
+        // Reset tare flags
+        tare_offset = 0;
+        tare_completed = false;
+        tare_sample_count = 0;
+        tare_sum = 0;
+        weight_threshold_reached = false;
       }
     }
   }
@@ -796,22 +896,71 @@ void loop()
     // check ack flag
     if (ack_A0_received)
     {
-      Serial.println("=== Transitioning to SEND_A1_LOOP state ===");
+      Serial.println("=== Transitioning to TARE_WEIGHT state ===");
+      Serial.println("Please ensure the scale is empty for tare calibration...");
       sent = false;
-      state = SEND_A1_LOOP;
+      state = TARE_WEIGHT;
+      tare_completed = false;
+      tare_sample_count = 0;
+      tare_sum = 0;
       lastPollSendMs = millis() - POLL_INTERVAL_MS; // trigger immediate send
     }
+    break;
+  }
+
+  case TARE_WEIGHT:
+  {
+    // Send A1 to read weight for tare calibration
+    if (now - lastPollSendMs >= WEIGHT_POLL_INTERVAL_MS)
+    {
+      lastPollSendMs = now;
+      Serial.println("Sending A1 for tare reading...");
+      send_cmd_A1();
+    }
+
+    // processDeviceFrame จะอัพเดทค่า weight มาให้เราเรื่อยๆ
+    // เราต้องอ่านค่า ADC จาก frame A1 เพื่อหาค่าเฉลี่ยสำหรับ tare
+    // Note: ต้องแก้ไข processDeviceFrame ให้สามารถเข้าถึงค่า adc_raw ได้
+    // หรือใช้วิธีเก็บค่าจาก global variable
+    
+    // ถ้าได้ครบจำนวนตัวอย่างแล้ว คำนวณค่าเฉลี่ยและเก็บเป็น tare_offset
+    if (tare_completed)
+    {
+      tare_offset = tare_sum / TARE_SAMPLES;
+      Serial.printf(">>> Tare completed! Offset = %ld ADC units\n", tare_offset);
+      Serial.println("=== Transitioning to WAIT_FOR_WEIGHT state ===");
+      Serial.printf("Please step on the scale (waiting for weight > %.1f kg)...\n", MIN_WEIGHT_TO_START);
+      state = WAIT_FOR_WEIGHT;
+      lastPollSendMs = millis() - POLL_INTERVAL_MS;
+    }
+    break;
+  }
+
+  case WAIT_FOR_WEIGHT:
+  {
+    // Send A1 to monitor weight until it exceeds minimum threshold
+    if (now - lastPollSendMs >= WEIGHT_POLL_INTERVAL_MS)
+    {
+      lastPollSendMs = now;
+      send_cmd_A1();
+    }
+
+    // The weight calculation is done in processDeviceFrame
+    // We check if current weight (after tare) exceeds MIN_WEIGHT_TO_START
+    // Note: We need to access the calculated weight from processDeviceFrame
+    // For now, we'll rely on a flag or check weight value
+    // Let's add logic in processDeviceFrame to set a flag when weight > threshold
+    
     break;
   }
 
   case SEND_A1_LOOP:
   {
     // Device may auto-send A1 frames or require polling
-    // Send A1 occasionally as keepalive/trigger (every 5 seconds)
-    if (now - lastPollSendMs >= 5000)
+    // Send A1 frequently for faster weight reading (every 200ms)
+    if (now - lastPollSendMs >= WEIGHT_POLL_INTERVAL_MS)
     {
       lastPollSendMs = now;
-      Serial.println("Sending A1 keepalive (read weight)...");
       send_cmd_A1();
     }
 
@@ -914,13 +1063,38 @@ void loop()
   case BUILD_AND_SEND_FINAL:
   {
     buildAndSendFinalPacket();
+    Serial.println("\n*** Measurement complete! ***");
+    Serial.println("Please step off the scale...");
     state = DONE;
+    lastPollSendMs = millis();
     break;
   }
 
   case DONE:
-    // finished. Could loop again or stop. For now we stay in DONE.
+  {
+    // Show result for a moment, then transition to wait for empty scale
+    if (now - lastPollSendMs >= 3000) // wait 3 seconds to show result
+    {
+      Serial.println("=== Transitioning to WAIT_SCALE_EMPTY state ===");
+      state = WAIT_SCALE_EMPTY;
+      lastPollSendMs = millis();
+    }
     break;
+  }
+
+  case WAIT_SCALE_EMPTY:
+  {
+    // Monitor weight until scale is empty
+    if (now - lastPollSendMs >= WEIGHT_POLL_INTERVAL_MS)
+    {
+      lastPollSendMs = now;
+      send_cmd_A1();
+    }
+    
+    // Weight check is done in processDeviceFrame
+    // When weight < MAX_WEIGHT_EMPTY, we'll transition back to WAIT_JSON
+    break;
+  }
   } // switch
 
   // small delay to avoid busy loop
