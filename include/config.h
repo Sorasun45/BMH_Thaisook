@@ -18,7 +18,7 @@ const float MIN_WEIGHT_TO_START = 20.0; // minimum weight in kg to start measuri
 const float MAX_WEIGHT_EMPTY = 5.0;     // maximum weight in kg to consider scale empty
 
 // Tare settings
-const int TARE_SAMPLES = 20;  // จำนวนตัวอย่างที่ใช้ในการ tare
+const int TARE_SAMPLES = 5;  // จำนวนตัวอย่างที่ใช้ในการ tare
 
 // RX buffer size
 #define RX_BUF_SIZE 512

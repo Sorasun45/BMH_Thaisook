@@ -14,7 +14,7 @@
 #define CHARACTERISTIC_UUID_TX "beb5483f-36e1-4688-b7f5-ea07361b26a8"
 
 // BLE Device Name
-#define BLE_DEVICE_NAME "BMH_Scale"
+#define BLE_DEVICE_NAME "Thaisook_BCA"
 
 // Callback function type for received data
 typedef void (*BLEDataCallback)(const String &data);

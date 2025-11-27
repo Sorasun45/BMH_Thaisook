@@ -233,19 +233,137 @@ pio device monitor
 ```json
 {
   "status": "success",
+  "total_packets": 5,
+  "received_packets": 5,
   "body_composition": {
-    "weight_kg": 70.5,
-    "moisture_kg": 42.3,
-    "body_fat_mass_kg": 15.2,
-    ...
+    "weight_kg": 80.4,
+    "weight_std_min_kg": 52.8,
+    "weight_std_max_kg": 71.4,
+    "moisture_kg": 43.8,
+    "moisture_std_min_kg": 34.8,
+    "moisture_std_max_kg": 42.6,
+    "body_fat_mass_kg": 20.6,
+    "body_fat_std_min_kg": 7.5,
+    "body_fat_std_max_kg": 15.0,
+    "protein_mass_kg": 11.8,
+    "protein_std_min_kg": 9.3,
+    "protein_std_max_kg": 11.4,
+    "inorganic_salt_kg": 4.2,
+    "inorganic_std_min_kg": 3.2,
+    "inorganic_std_max_kg": 3.9,
+    "lean_body_weight_kg": 59.8,
+    "lean_body_std_min_kg": 45.3,
+    "lean_body_std_max_kg": 56.4,
+    "muscle_mass_kg": 55.6,
+    "muscle_std_min_kg": 44.8,
+    "muscle_std_max_kg": 61.6,
+    "bone_mass_kg": 3.3,
+    "bone_std_min_kg": 2.7,
+    "bone_std_max_kg": 3.3,
+    "skeletal_muscle_kg": 33.9,
+    "skeletal_std_min_kg": 26.4,
+    "skeletal_std_max_kg": 32.3,
+    "intracellular_water_kg": 27.5,
+    "ic_water_std_min_kg": 21.6,
+    "ic_water_std_max_kg": 26.5,
+    "extracellular_water_kg": 16.2,
+    "ec_water_std_min_kg": 13.3,
+    "ec_water_std_max_kg": 16.2,
+    "body_cell_mass_kg": 39.4,
+    "bcm_std_min_kg": 31.0,
+    "bcm_std_max_kg": 37.9,
+    "subcutaneous_fat_mass_kg": 18.3
+  },
+  "segmental_analysis": {
+    "fat_mass_kg": {
+      "right_hand": 1.2,
+      "left_hand": 1.2,
+      "trunk": 10.6,
+      "right_foot": 2.7,
+      "left_foot": 2.8
+    },
+    "fat_percent": {
+      "right_hand": 240.0,
+      "left_hand": 240.0,
+      "trunk": 271.7,
+      "right_foot": 180.0,
+      "left_foot": 186.6
+    },
+    "muscle_mass_kg": {
+      "right_hand": 3.0,
+      "left_hand": 3.1,
+      "trunk": 26.5,
+      "right_foot": 9.6,
+      "left_foot": 9.3
+    },
+    "muscle_ratio_percent": {
+      "right_hand": 100.0,
+      "left_hand": 103.3,
+      "trunk": 106.8,
+      "right_foot": 111.6,
+      "left_foot": 108.1
+    }
   },
   "health_metrics": {
-    "bmi": 25.0,
-    "body_fat_percent": 21.5,
-    "bmr_kcal": 1650,
-    ...
+    "body_score": 76,
+    "physical_age": 28,
+    "body_type": 5,
+    "body_type_name": "Fat muscular type",
+    "smi": 8.8,
+    "whr": 0.86,
+    "whr_std_min": 0.80,
+    "whr_std_max": 0.90,
+    "visceral_fat": 8,
+    "vf_std_min": 1,
+    "vf_std_max": 9,
+    "obesity_percent": 12.9,
+    "obesity_std_min": 9.0,
+    "obesity_std_max": 11.0,
+    "bmi": 28.4,
+    "bmi_std_min": 18.5,
+    "bmi_std_max": 23.0,
+    "body_fat_percent": 25.6,
+    "body_fat_std_min": 10.0,
+    "body_fat_std_max": 20.0,
+    "bmr_kcal": 1661,
+    "bmr_std_min_kcal": 1699,
+    "bmr_std_max_kcal": 1994,
+    "recommended_intake_kcal": 2159,
+    "ideal_weight_kg": 62.1,
+    "target_weight_kg": 70.4,
+    "weight_control_kg": -10.0,
+    "muscle_control_kg": 0.0,
+    "fat_control_kg": -10.0,
+    "subcutaneous_fat_percent": 22.7,
+    "subq_std_min": 8.6,
+    "subq_std_max": 16.7
   },
-  "segmental_analysis": { ... }
+  "energy_consumption_kcal_per_30min": {
+    "walk": 160,
+    "golf": 141,
+    "croquet": 152,
+    "tennis_cycling_basketball": 241,
+    "squash_tkd_fencing": 402,
+    "mountain_climbing": 262,
+    "swimming_aerobic_jog": 281,
+    "badminton_table_tennis": 181
+  },
+  "segmental_standards": {
+    "fat_standard": {
+      "right_hand": "high",
+      "left_hand": "high",
+      "trunk": "high",
+      "right_foot": "high",
+      "left_foot": "high"
+    },
+    "muscle_standard": {
+      "right_hand": "normal",
+      "left_hand": "normal",
+      "trunk": "normal",
+      "right_foot": "high",
+      "left_foot": "normal"
+    }
+  }
 }
 ```
 
