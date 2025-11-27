@@ -1,8 +1,9 @@
 /*
-  BMH UART state machine - Refactored Version
+  BMH UART state machine - Refactored Version with BLE
   
   Main entry point for the BMH body composition analyzer system.
-  Handles JSON input, state machine coordination, and serial communication.
+  Handles JSON input via BLE and Serial, state machine coordination, 
+  and serial communication with BMH device.
 */
 
 #include <Arduino.h>
@@ -15,9 +16,17 @@
 #include "buffer.h"
 #include "measurement.h"
 #include "state_machine.h"
+#include "ble_handler.h"
 
 HardwareSerial BMH(2); // UART2
 StateMachineContext smContext;
+
+// BLE data callback
+void onBLEDataReceived(const String &data) {
+  Serial.println("Processing data from BLE:");
+  Serial.println(data);
+  handleJsonInput(data, smContext);
+}
 
 void pollBMHReceive()
 {
@@ -61,12 +70,17 @@ void setup()
   BMH.begin(BMH_BAUD, SERIAL_8N1, BMH_RX_PIN, BMH_TX_PIN);
 
   Serial.println();
-  Serial.println("=== BMH05108 UART StateMachine Ready (Refactored) ===");
+  Serial.println("=== BMH05108 UART StateMachine Ready (BLE Enabled) ===");
   
   loadCalibration(smContext.calib);
   initStateMachine(smContext);
   
-  Serial.println("Paste JSON like: {\"gender\":1,\"product_id\":0,\"height\":168,\"age\":23}");
+  // Initialize BLE
+  bleHandler.begin(onBLEDataReceived);
+  
+  Serial.println("System ready!");
+  Serial.println("- Send JSON via BLE from Flutter app");
+  Serial.println("- Or paste JSON in Serial Monitor: {\"gender\":1,\"product_id\":0,\"height\":168,\"age\":23}");
   Serial.println();
 }
 

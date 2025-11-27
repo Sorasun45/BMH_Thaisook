@@ -2,6 +2,7 @@
 #include "state_machine.h"
 #include "protocol.h"
 #include "config.h"
+#include "ble_handler.h"
 #include <ArduinoJson.h>
 
 void initStateMachine(StateMachineContext &ctx) {
@@ -121,6 +122,21 @@ void processStateMachine(StateMachineContext &ctx) {
     if (ctx.mData.weight_final_valid)
     {
       Serial.println("Weight stabilized. Proceeding to B0 start.");
+      
+      // Send weight finalized and impedance measurement starting notification via BLE
+      if (bleHandler.isConnected())
+      {
+        StaticJsonDocument<256> doc;
+        doc["type"] = "weight_finalized";
+        doc["weight"] = (float)ctx.mData.weight_final / 10.0;
+        doc["status"] = "starting_impedance_measurement";
+        
+        String jsonString;
+        serializeJson(doc, jsonString);
+        bleHandler.sendData(jsonString);
+        Serial.println("Sent weight finalized and starting impedance measurement via BLE");
+      }
+      
       ctx.currentState = SEND_B0_WAIT_ACK;
     }
     break;
@@ -228,7 +244,17 @@ void processStateMachine(StateMachineContext &ctx) {
     if (ctx.mData.resultPackets.isComplete())
     {
       Serial.println("\n*** All result packets received! ***");
+      // Display result to Serial Monitor
       parseAndDisplayResultJSON(ctx.mData.resultPackets);
+      
+      // Send result via BLE if connected
+      if (bleHandler.isConnected())
+      {
+        String jsonResult = generateResultJSON(ctx.mData.resultPackets);
+        bleHandler.sendData(jsonResult);
+        Serial.println("Result sent via BLE");
+      }
+      
       Serial.println("Please step off the scale...");
       ctx.currentState = DONE;
       ctx.lastPollSendMs = millis();
