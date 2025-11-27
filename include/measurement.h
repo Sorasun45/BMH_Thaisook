@@ -57,4 +57,7 @@ void buildAndSendFinalPacket(const UserInfo &userInfo, const MeasurementData &mD
 // Parse and display result packets as JSON
 void parseAndDisplayResultJSON(const ResultPackets &packets);
 
+// Generate JSON string from result packets (for BLE transmission)
+String generateResultJSON(const ResultPackets &packets);
+
 #endif // MEASUREMENT_H

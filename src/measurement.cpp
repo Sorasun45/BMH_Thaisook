@@ -681,3 +681,223 @@ void parseAndDisplayResultJSON(const ResultPackets &packets)
   Serial.println("}");
   Serial.println("=========================\n");
 }
+
+String generateResultJSON(const ResultPackets &packets)
+{
+  String json = "";
+  
+  // Check for errors first
+  if (packets.hasError())
+  {
+    json += "{\n";
+    json += "  \"status\": \"error\",\n";
+    json += "  \"error_code\": \"0x";
+    json += String(packets.error_type, HEX);
+    json += "\",\n";
+    json += "  \"error_message\": \"";
+    json += getErrorTypeString(packets.error_type);
+    json += "\"\n";
+    json += "}";
+    return json;
+  }
+  
+  json += "{\n";
+  json += "  \"status\": \"success\",\n";
+  json += "  \"total_packets\": " + String(packets.total_packets) + ",\n";
+  json += "  \"received_packets\": " + String(packets.received_count) + ",\n";
+  
+  // ===== PACKET 1 (0x51) - Main body composition =====
+  if (packets.received1 && packets.len1 == 0x50)
+  {
+    const uint8_t *p = packets.packet1;
+    json += "  \"body_composition\": {\n";
+    
+    json += "    \"weight_kg\": " + String(le_u16(&p[5]) / 10.0, 1) + ",\n";
+    json += "    \"weight_std_min_kg\": " + String(le_u16(&p[7]) / 10.0, 1) + ",\n";
+    json += "    \"weight_std_max_kg\": " + String(le_u16(&p[9]) / 10.0, 1) + ",\n";
+    
+    json += "    \"moisture_kg\": " + String(le_u16(&p[11]) / 10.0, 1) + ",\n";
+    json += "    \"moisture_std_min_kg\": " + String(le_u16(&p[13]) / 10.0, 1) + ",\n";
+    json += "    \"moisture_std_max_kg\": " + String(le_u16(&p[15]) / 10.0, 1) + ",\n";
+    
+    json += "    \"body_fat_mass_kg\": " + String(le_u16(&p[17]) / 10.0, 1) + ",\n";
+    json += "    \"body_fat_std_min_kg\": " + String(le_u16(&p[19]) / 10.0, 1) + ",\n";
+    json += "    \"body_fat_std_max_kg\": " + String(le_u16(&p[21]) / 10.0, 1) + ",\n";
+    
+    json += "    \"protein_mass_kg\": " + String(le_u16(&p[23]) / 10.0, 1) + ",\n";
+    json += "    \"protein_std_min_kg\": " + String(le_u16(&p[25]) / 10.0, 1) + ",\n";
+    json += "    \"protein_std_max_kg\": " + String(le_u16(&p[27]) / 10.0, 1) + ",\n";
+    
+    json += "    \"inorganic_salt_kg\": " + String(le_u16(&p[29]) / 10.0, 1) + ",\n";
+    json += "    \"inorganic_std_min_kg\": " + String(le_u16(&p[31]) / 10.0, 1) + ",\n";
+    json += "    \"inorganic_std_max_kg\": " + String(le_u16(&p[33]) / 10.0, 1) + ",\n";
+    
+    json += "    \"lean_body_weight_kg\": " + String(le_u16(&p[35]) / 10.0, 1) + ",\n";
+    json += "    \"lean_body_std_min_kg\": " + String(le_u16(&p[37]) / 10.0, 1) + ",\n";
+    json += "    \"lean_body_std_max_kg\": " + String(le_u16(&p[39]) / 10.0, 1) + ",\n";
+    
+    json += "    \"muscle_mass_kg\": " + String(le_u16(&p[41]) / 10.0, 1) + ",\n";
+    json += "    \"muscle_std_min_kg\": " + String(le_u16(&p[43]) / 10.0, 1) + ",\n";
+    json += "    \"muscle_std_max_kg\": " + String(le_u16(&p[45]) / 10.0, 1) + ",\n";
+    
+    json += "    \"bone_mass_kg\": " + String(le_u16(&p[47]) / 10.0, 1) + ",\n";
+    json += "    \"bone_std_min_kg\": " + String(le_u16(&p[49]) / 10.0, 1) + ",\n";
+    json += "    \"bone_std_max_kg\": " + String(le_u16(&p[51]) / 10.0, 1) + ",\n";
+    
+    json += "    \"skeletal_muscle_kg\": " + String(le_u16(&p[53]) / 10.0, 1) + ",\n";
+    json += "    \"skeletal_std_min_kg\": " + String(le_u16(&p[55]) / 10.0, 1) + ",\n";
+    json += "    \"skeletal_std_max_kg\": " + String(le_u16(&p[57]) / 10.0, 1) + ",\n";
+    
+    json += "    \"intracellular_water_kg\": " + String(le_u16(&p[59]) / 10.0, 1) + ",\n";
+    json += "    \"ic_water_std_min_kg\": " + String(le_u16(&p[61]) / 10.0, 1) + ",\n";
+    json += "    \"ic_water_std_max_kg\": " + String(le_u16(&p[63]) / 10.0, 1) + ",\n";
+    
+    json += "    \"extracellular_water_kg\": " + String(le_u16(&p[65]) / 10.0, 1) + ",\n";
+    json += "    \"ec_water_std_min_kg\": " + String(le_u16(&p[67]) / 10.0, 1) + ",\n";
+    json += "    \"ec_water_std_max_kg\": " + String(le_u16(&p[69]) / 10.0, 1) + ",\n";
+    
+    json += "    \"body_cell_mass_kg\": " + String(le_u16(&p[71]) / 10.0, 1) + ",\n";
+    json += "    \"bcm_std_min_kg\": " + String(le_u16(&p[73]) / 10.0, 1) + ",\n";
+    json += "    \"bcm_std_max_kg\": " + String(le_u16(&p[75]) / 10.0, 1) + ",\n";
+    
+    json += "    \"subcutaneous_fat_mass_kg\": " + String(le_u16(&p[77]) / 10.0, 1) + "\n";
+    json += "  },\n";
+  }
+  
+  // ===== PACKET 2 (0x52) - Segmental analysis =====
+  if (packets.received2 && packets.len2 == 0x2E)
+  {
+    const uint8_t *p = packets.packet2;
+    json += "  \"segmental_analysis\": {\n";
+    
+    json += "    \"fat_mass_kg\": {\n";
+    json += "      \"right_hand\": " + String(le_u16(&p[5]) / 10.0, 1) + ",\n";
+    json += "      \"left_hand\": " + String(le_u16(&p[7]) / 10.0, 1) + ",\n";
+    json += "      \"trunk\": " + String(le_u16(&p[9]) / 10.0, 1) + ",\n";
+    json += "      \"right_foot\": " + String(le_u16(&p[11]) / 10.0, 1) + ",\n";
+    json += "      \"left_foot\": " + String(le_u16(&p[13]) / 10.0, 1) + "\n";
+    json += "    },\n";
+    
+    json += "    \"fat_percent\": {\n";
+    json += "      \"right_hand\": " + String(le_u16(&p[15]) / 10.0, 1) + ",\n";
+    json += "      \"left_hand\": " + String(le_u16(&p[17]) / 10.0, 1) + ",\n";
+    json += "      \"trunk\": " + String(le_u16(&p[19]) / 10.0, 1) + ",\n";
+    json += "      \"right_foot\": " + String(le_u16(&p[21]) / 10.0, 1) + ",\n";
+    json += "      \"left_foot\": " + String(le_u16(&p[23]) / 10.0, 1) + "\n";
+    json += "    },\n";
+    
+    json += "    \"muscle_mass_kg\": {\n";
+    json += "      \"right_hand\": " + String(le_u16(&p[25]) / 10.0, 1) + ",\n";
+    json += "      \"left_hand\": " + String(le_u16(&p[27]) / 10.0, 1) + ",\n";
+    json += "      \"trunk\": " + String(le_u16(&p[29]) / 10.0, 1) + ",\n";
+    json += "      \"right_foot\": " + String(le_u16(&p[31]) / 10.0, 1) + ",\n";
+    json += "      \"left_foot\": " + String(le_u16(&p[33]) / 10.0, 1) + "\n";
+    json += "    },\n";
+    
+    json += "    \"muscle_ratio_percent\": {\n";
+    json += "      \"right_hand\": " + String(le_u16(&p[35]) / 10.0, 1) + ",\n";
+    json += "      \"left_hand\": " + String(le_u16(&p[37]) / 10.0, 1) + ",\n";
+    json += "      \"trunk\": " + String(le_u16(&p[39]) / 10.0, 1) + ",\n";
+    json += "      \"right_foot\": " + String(le_u16(&p[41]) / 10.0, 1) + ",\n";
+    json += "      \"left_foot\": " + String(le_u16(&p[43]) / 10.0, 1) + "\n";
+    json += "    }\n";
+    json += "  },\n";
+  }
+  
+  // ===== PACKET 3 (0x53) - Health metrics =====
+  if (packets.received3 && packets.len3 == 0x3A)
+  {
+    const uint8_t *p = packets.packet3;
+    json += "  \"health_metrics\": {\n";
+    
+    json += "    \"body_score\": " + String(p[5]) + ",\n";
+    json += "    \"physical_age\": " + String(p[6]) + ",\n";
+    json += "    \"body_type\": " + String(p[7]) + ",\n";
+    json += "    \"body_type_name\": \"" + String(getBodyTypeString(p[7])) + "\",\n";
+    json += "    \"smi\": " + String(p[8] / 10.0, 1) + ",\n";
+    
+    json += "    \"whr\": " + String(p[9] * 0.01, 2) + ",\n";
+    json += "    \"whr_std_min\": " + String(p[10] * 0.01, 2) + ",\n";
+    json += "    \"whr_std_max\": " + String(p[11] * 0.01, 2) + ",\n";
+    
+    json += "    \"visceral_fat\": " + String(p[12]) + ",\n";
+    json += "    \"vf_std_min\": " + String(p[13]) + ",\n";
+    json += "    \"vf_std_max\": " + String(p[14]) + ",\n";
+    
+    json += "    \"obesity_percent\": " + String(le_u16(&p[15]) / 10.0, 1) + ",\n";
+    json += "    \"obesity_std_min\": " + String(le_u16(&p[17]) / 10.0, 1) + ",\n";
+    json += "    \"obesity_std_max\": " + String(le_u16(&p[19]) / 10.0, 1) + ",\n";
+    
+    json += "    \"bmi\": " + String(le_u16(&p[21]) / 10.0, 1) + ",\n";
+    json += "    \"bmi_std_min\": " + String(le_u16(&p[23]) / 10.0, 1) + ",\n";
+    json += "    \"bmi_std_max\": " + String(le_u16(&p[25]) / 10.0, 1) + ",\n";
+    
+    json += "    \"body_fat_percent\": " + String(le_u16(&p[27]) / 10.0, 1) + ",\n";
+    json += "    \"body_fat_std_min\": " + String(le_u16(&p[29]) / 10.0, 1) + ",\n";
+    json += "    \"body_fat_std_max\": " + String(le_u16(&p[31]) / 10.0, 1) + ",\n";
+    
+    json += "    \"bmr_kcal\": " + String(le_u16(&p[33])) + ",\n";
+    json += "    \"bmr_std_min_kcal\": " + String(le_u16(&p[35])) + ",\n";
+    json += "    \"bmr_std_max_kcal\": " + String(le_u16(&p[37])) + ",\n";
+    
+    json += "    \"recommended_intake_kcal\": " + String(le_u16(&p[39])) + ",\n";
+    json += "    \"ideal_weight_kg\": " + String(le_u16(&p[41]) / 10.0, 1) + ",\n";
+    json += "    \"target_weight_kg\": " + String(le_u16(&p[43]) / 10.0, 1) + ",\n";
+    
+    int16_t weight_ctrl = (int16_t)le_u16(&p[45]);
+    int16_t muscle_ctrl = (int16_t)le_u16(&p[47]);
+    int16_t fat_ctrl = (int16_t)le_u16(&p[49]);
+    json += "    \"weight_control_kg\": " + String(weight_ctrl / 10.0, 1) + ",\n";
+    json += "    \"muscle_control_kg\": " + String(muscle_ctrl / 10.0, 1) + ",\n";
+    json += "    \"fat_control_kg\": " + String(fat_ctrl / 10.0, 1) + ",\n";
+    
+    json += "    \"subcutaneous_fat_percent\": " + String(le_u16(&p[51]) / 10.0, 1) + ",\n";
+    json += "    \"subq_std_min\": " + String(le_u16(&p[53]) / 10.0, 1) + ",\n";
+    json += "    \"subq_std_max\": " + String(le_u16(&p[55]) / 10.0, 1) + "\n";
+    json += "  },\n";
+  }
+  
+  // ===== PACKET 4 (0x54) - Energy consumption =====
+  if (packets.received4 && packets.len4 == 0x16)
+  {
+    const uint8_t *p = packets.packet4;
+    json += "  \"energy_consumption_kcal_per_30min\": {\n";
+    
+    json += "    \"walk\": " + String(le_u16(&p[5])) + ",\n";
+    json += "    \"golf\": " + String(le_u16(&p[7])) + ",\n";
+    json += "    \"croquet\": " + String(le_u16(&p[9])) + ",\n";
+    json += "    \"tennis_cycling_basketball\": " + String(le_u16(&p[11])) + ",\n";
+    json += "    \"squash_tkd_fencing\": " + String(le_u16(&p[13])) + ",\n";
+    json += "    \"mountain_climbing\": " + String(le_u16(&p[15])) + ",\n";
+    json += "    \"swimming_aerobic_jog\": " + String(le_u16(&p[17])) + ",\n";
+    json += "    \"badminton_table_tennis\": " + String(le_u16(&p[19])) + "\n";
+    json += "  },\n";
+  }
+  
+  // ===== PACKET 5 (0x55) - Standard classifications =====
+  if (packets.received5 && packets.len5 == 0x16)
+  {
+    const uint8_t *p = packets.packet5;
+    json += "  \"segmental_standards\": {\n";
+    
+    json += "    \"fat_standard\": {\n";
+    json += "      \"right_hand\": \"" + String(getStdLevelString(p[5])) + "\",\n";
+    json += "      \"left_hand\": \"" + String(getStdLevelString(p[6])) + "\",\n";
+    json += "      \"trunk\": \"" + String(getStdLevelString(p[7])) + "\",\n";
+    json += "      \"right_foot\": \"" + String(getStdLevelString(p[8])) + "\",\n";
+    json += "      \"left_foot\": \"" + String(getStdLevelString(p[9])) + "\"\n";
+    json += "    },\n";
+    
+    json += "    \"muscle_standard\": {\n";
+    json += "      \"right_hand\": \"" + String(getStdLevelString(p[10])) + "\",\n";
+    json += "      \"left_hand\": \"" + String(getStdLevelString(p[11])) + "\",\n";
+    json += "      \"trunk\": \"" + String(getStdLevelString(p[12])) + "\",\n";
+    json += "      \"right_foot\": \"" + String(getStdLevelString(p[13])) + "\",\n";
+    json += "      \"left_foot\": \"" + String(getStdLevelString(p[14])) + "\"\n";
+    json += "    }\n";
+    json += "  }\n";
+  }
+  
+  json += "}";
+  return json;
+}

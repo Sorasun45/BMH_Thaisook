@@ -1,6 +1,7 @@
 #include "state_machine.h"
 #include "protocol.h"
 #include "config.h"
+#include "ble_handler.h"
 #include <ArduinoJson.h>
 
 void initStateMachine(StateMachineContext &ctx) {
@@ -227,7 +228,17 @@ void processStateMachine(StateMachineContext &ctx) {
     if (ctx.mData.resultPackets.isComplete())
     {
       Serial.println("\n*** All result packets received! ***");
+      // Display result to Serial Monitor
       parseAndDisplayResultJSON(ctx.mData.resultPackets);
+      
+      // Send result via BLE if connected
+      if (bleHandler.isConnected())
+      {
+        String jsonResult = generateResultJSON(ctx.mData.resultPackets);
+        bleHandler.sendData(jsonResult);
+        Serial.println("Result sent via BLE");
+      }
+      
       Serial.println("Please step off the scale...");
       ctx.currentState = DONE;
       ctx.lastPollSendMs = millis();
