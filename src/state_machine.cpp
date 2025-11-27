@@ -1,3 +1,4 @@
+// ลำดับงาน
 #include "state_machine.h"
 #include "protocol.h"
 #include "config.h"

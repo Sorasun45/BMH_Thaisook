@@ -12,7 +12,10 @@ const unsigned long POLL_INTERVAL_MS = 200; // 200 ms
 const unsigned long WEIGHT_POLL_INTERVAL_MS = 200; // 200 ms for faster weight reading
 
 // Stability thresholds
-const int STABLE_DELTA = 150;       // ±150 units (increased tolerance for faster lock)
+const int STABLE_DELTA = 10;
+const int STABLE_WEIGHT_DELTA = 10;
+const int STABLE_IMPEDANCE_DELTA = 100;
+
 const int STABLE_REQUIRED_CNT = 30;  // consecutive samples
 const float MIN_WEIGHT_TO_START = 20.0; // minimum weight in kg to start measuring
 const float MAX_WEIGHT_EMPTY = 5.0;     // maximum weight in kg to consider scale empty
