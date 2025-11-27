@@ -121,6 +121,21 @@ void processStateMachine(StateMachineContext &ctx) {
     if (ctx.mData.weight_final_valid)
     {
       Serial.println("Weight stabilized. Proceeding to B0 start.");
+      
+      // Send weight finalized and impedance measurement starting notification via BLE
+      if (bleHandler.isConnected())
+      {
+        StaticJsonDocument<256> doc;
+        doc["type"] = "weight_finalized";
+        doc["weight"] = (float)ctx.mData.weight_final / 10.0;
+        doc["status"] = "starting_impedance_measurement";
+        
+        String jsonString;
+        serializeJson(doc, jsonString);
+        bleHandler.sendData(jsonString);
+        Serial.println("Sent weight finalized and starting impedance measurement via BLE");
+      }
+      
       ctx.currentState = SEND_B0_WAIT_ACK;
     }
     break;

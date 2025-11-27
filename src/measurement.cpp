@@ -1,6 +1,8 @@
 #include "measurement.h"
 #include "protocol.h"
 #include "config.h"
+#include "ble_handler.h"
+#include <ArduinoJson.h>
 
 void initMeasurementData(MeasurementData &data) {
   data.weight_final = 0;
@@ -169,6 +171,19 @@ void processDeviceFrame(const uint8_t *frame, size_t frameLen,
 
       Serial.printf("ADC-based Weight=%.3f kg | stable=%d\n",
                     weight_kg, mData.weightStableCount);
+
+      // Send real-time weight to BLE app
+      if (state == SEND_A1_LOOP && bleHandler.isConnected())
+      {
+        StaticJsonDocument<128> doc;
+        doc["type"] = "weight_realtime";
+        doc["weight"] = round(weight_kg * 100.0) / 100.0; // 2 decimal places
+        doc["stable_count"] = mData.weightStableCount;
+        
+        String jsonString;
+        serializeJson(doc, jsonString);
+        bleHandler.sendData(jsonString);
+      }
 
       if (mData.weightStableCount >= STABLE_REQUIRED_CNT)
       {
