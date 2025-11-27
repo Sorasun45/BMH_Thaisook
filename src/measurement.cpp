@@ -1,3 +1,4 @@
+// ประมวลผลเฟรม/สร้าง D0/แปลงผล
 #include "measurement.h"
 #include "protocol.h"
 #include "config.h"
@@ -158,7 +159,7 @@ void processDeviceFrame(const uint8_t *frame, size_t frameLen,
       else
       {
         long diff = labs(usedValueForStability - mData.lastWeightValue);
-        if (diff <= STABLE_DELTA)
+        if (diff <= STABLE_WEIGHT_DELTA)
           mData.weightStableCount++;
         else
         {
@@ -212,8 +213,8 @@ void processDeviceFrame(const uint8_t *frame, size_t frameLen,
           long d4 = (long)labs((long)rf - (long)mData.lastImpRF);
           long d5 = (long)labs((long)lf - (long)mData.lastImpLF);
 
-          if (d1 <= STABLE_DELTA && d2 <= STABLE_DELTA && d3 <= STABLE_DELTA && 
-              d4 <= STABLE_DELTA && d5 <= STABLE_DELTA)
+          if (d1 <= STABLE_IMPEDANCE_DELTA && d2 <= STABLE_IMPEDANCE_DELTA && d3 <= STABLE_IMPEDANCE_DELTA && 
+              d4 <= STABLE_IMPEDANCE_DELTA && d5 <= STABLE_IMPEDANCE_DELTA)
           {
             mData.impStableCount++;
           }
