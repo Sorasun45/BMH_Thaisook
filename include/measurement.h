@@ -55,9 +55,9 @@ void processDeviceFrame(const uint8_t *frame, size_t frameLen,
 void buildAndSendFinalPacket(const UserInfo &userInfo, const MeasurementData &mData);
 
 // Parse and display result packets as JSON
-void parseAndDisplayResultJSON(const ResultPackets &packets);
+void parseAndDisplayResultJSON(const ResultPackets &packets, const MeasurementData &mData);
 
 // Generate JSON string from result packets (for BLE transmission)
-String generateResultJSON(const ResultPackets &packets);
+String generateResultJSON(const ResultPackets &packets, const MeasurementData &mData);
 
 #endif // MEASUREMENT_H

@@ -245,12 +245,12 @@ void processStateMachine(StateMachineContext &ctx) {
     {
       Serial.println("\n*** All result packets received! ***");
       // Display result to Serial Monitor
-      parseAndDisplayResultJSON(ctx.mData.resultPackets);
+      parseAndDisplayResultJSON(ctx.mData.resultPackets, ctx.mData);
       
       // Send result via BLE if connected
       if (bleHandler.isConnected())
       {
-        String jsonResult = generateResultJSON(ctx.mData.resultPackets);
+        String jsonResult = generateResultJSON(ctx.mData.resultPackets, ctx.mData);
         bleHandler.sendData(jsonResult);
         Serial.println("Result sent via BLE");
       }

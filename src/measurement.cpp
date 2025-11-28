@@ -475,7 +475,7 @@ const char* getStdLevelString(uint8_t level)
   }
 }
 
-void parseAndDisplayResultJSON(const ResultPackets &packets)
+void parseAndDisplayResultJSON(const ResultPackets &packets, const MeasurementData &mData)
 {
   Serial.println("\n=== MEASUREMENT RESULTS ===");
   
@@ -495,6 +495,24 @@ void parseAndDisplayResultJSON(const ResultPackets &packets)
   Serial.println("  \"status\": \"success\",");
   Serial.printf("  \"total_packets\": %d,\n", packets.total_packets);
   Serial.printf("  \"received_packets\": %d,\n", packets.received_count);
+  
+  // Display impedance measurements (in Ohms)
+  Serial.println("  \"impedance_measurements\": {");
+  Serial.println("    \"20khz\": {");
+  Serial.printf("      \"right_hand_ohm\": %.1f,\n", mData.imp_20k.rh / 10.0);
+  Serial.printf("      \"left_hand_ohm\": %.1f,\n", mData.imp_20k.lh / 10.0);
+  Serial.printf("      \"trunk_ohm\": %.1f,\n", mData.imp_20k.trunk / 10.0);
+  Serial.printf("      \"right_foot_ohm\": %.1f,\n", mData.imp_20k.rf / 10.0);
+  Serial.printf("      \"left_foot_ohm\": %.1f\n", mData.imp_20k.lf / 10.0);
+  Serial.println("    },");
+  Serial.println("    \"100khz\": {");
+  Serial.printf("      \"right_hand_ohm\": %.1f,\n", mData.imp_100k.rh / 10.0);
+  Serial.printf("      \"left_hand_ohm\": %.1f,\n", mData.imp_100k.lh / 10.0);
+  Serial.printf("      \"trunk_ohm\": %.1f,\n", mData.imp_100k.trunk / 10.0);
+  Serial.printf("      \"right_foot_ohm\": %.1f,\n", mData.imp_100k.rf / 10.0);
+  Serial.printf("      \"left_foot_ohm\": %.1f\n", mData.imp_100k.lf / 10.0);
+  Serial.println("    }");
+  Serial.println("  },");
   
   // ===== PACKET 1 (0x51) - Main body composition =====
   if (packets.received1 && packets.len1 == 0x50)
@@ -698,7 +716,7 @@ void parseAndDisplayResultJSON(const ResultPackets &packets)
   Serial.println("=========================\n");
 }
 
-String generateResultJSON(const ResultPackets &packets)
+String generateResultJSON(const ResultPackets &packets, const MeasurementData &mData)
 {
   String json = "";
   
@@ -721,6 +739,24 @@ String generateResultJSON(const ResultPackets &packets)
   json += "  \"status\": \"success\",\n";
   json += "  \"total_packets\": " + String(packets.total_packets) + ",\n";
   json += "  \"received_packets\": " + String(packets.received_count) + ",\n";
+  
+  // ===== RAW IMPEDANCE MEASUREMENTS (in Ohms) =====
+  json += "  \"impedance_measurements\": {\n";
+  json += "    \"20khz\": {\n";
+  json += "      \"right_hand_ohm\": " + String(mData.imp_20k.rh / 10.0, 1) + ",\n";
+  json += "      \"left_hand_ohm\": " + String(mData.imp_20k.lh / 10.0, 1) + ",\n";
+  json += "      \"trunk_ohm\": " + String(mData.imp_20k.trunk / 10.0, 1) + ",\n";
+  json += "      \"right_foot_ohm\": " + String(mData.imp_20k.rf / 10.0, 1) + ",\n";
+  json += "      \"left_foot_ohm\": " + String(mData.imp_20k.lf / 10.0, 1) + "\n";
+  json += "    },\n";
+  json += "    \"100khz\": {\n";
+  json += "      \"right_hand_ohm\": " + String(mData.imp_100k.rh / 10.0, 1) + ",\n";
+  json += "      \"left_hand_ohm\": " + String(mData.imp_100k.lh / 10.0, 1) + ",\n";
+  json += "      \"trunk_ohm\": " + String(mData.imp_100k.trunk / 10.0, 1) + ",\n";
+  json += "      \"right_foot_ohm\": " + String(mData.imp_100k.rf / 10.0, 1) + ",\n";
+  json += "      \"left_foot_ohm\": " + String(mData.imp_100k.lf / 10.0, 1) + "\n";
+  json += "    }\n";
+  json += "  },\n";
   
   // ===== PACKET 1 (0x51) - Main body composition =====
   if (packets.received1 && packets.len1 == 0x50)
